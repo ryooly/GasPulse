@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -14,62 +15,19 @@ from sqlalchemy import (
     Numeric,
     String,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.blockchain_models import 
+from db.base import Base, utcnow
 
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-class Base(DeclarativeBase):
+if TYPE_CHECKING:
+    from app.models.blockchains import Blockchain
+    from app.models.time_unit_models import TimeUnit
 
 
 class FeeStatus(str, enum.Enum):
     UP = "up"
     DOWN = "down"
     STABLE = "stable"
-
-
-class Blockchain(Base):
-
-    __tablename__ = "blockchains"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(
-        String(100), nullable=False, unique=True, index=True,
-    )
-    symbol: Mapped[str] = mapped_column(
-        String(20), nullable=False, unique=True, index=True,
-    )
-    chain_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True,
-    )
-    native_currency: Mapped[str] = mapped_column(
-        String(50), nullable=False,
-    )
-    explorer_api_url: Mapped[str | None] = mapped_column(
-        String(255), nullable=True,
-    )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow,
-    )
-
-    fee_snapshots: Mapped[list[FeeSnapshot]] = relationship(
-        back_populates="blockchain",
-        cascade="all, delete-orphan",
-    )
-
-    def __repr__(self) -> str: 
-        return f"<Blockchain id={self.id} name={self.name!r} symbol={self.symbol!r}>"
-
 
 class FeeSnapshot(Base):
 
@@ -78,6 +36,9 @@ class FeeSnapshot(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     blockchain_id: Mapped[int] = mapped_column(
         ForeignKey("blockchains.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    time_unit_id: Mapped[int] = mapped_column(
+        ForeignKey("time_units.id", ondelete="RESTRICT"), nullable=False, index=True,
     )
     raw_fee_value: Mapped[Decimal] = mapped_column(
         Numeric(38, 18), nullable=False,
@@ -127,12 +88,14 @@ class FeeSnapshot(Base):
     )
 
     blockchain: Mapped[Blockchain] = relationship(back_populates="fee_snapshots")
+    time_unit: Mapped[TimeUnit] = relationship(back_populates="fee_snapshots")
 
     def __repr__(self) -> str: 
         return (
             f"<FeeSnapshot id={self.id} blockchain_id={self.blockchain_id} "
+            f"time_unit_id={self.time_unit_id} "
             f"status={self.status.value!r} recorded_at={self.recorded_at!r}>"
         )
 
 
-__all__ = ["Base", "Blockchain", "FeeSnapshot", "FeeStatus", "utcnow"]
+__all__ = ["FeeSnapshot", "FeeStatus"]
