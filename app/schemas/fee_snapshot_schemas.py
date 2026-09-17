@@ -5,7 +5,13 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasPath,
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_validator,
+)
 
 from app.models.fee_snapshot_models import FeeStatus
 
@@ -82,9 +88,42 @@ class FeeSnapshotRead(FeeSnapshotBase):
     created_at: datetime
 
 
+class FeeSnapshotPublic(BaseModel):
+    """User-facing fee snapshot returned by the public fee endpoints.
+
+    Mirrors the full ``FeeSnapshot`` payload for the frontend but drops
+    internal-only fields that should never be shown to users (``created_at``
+    and the raw ``blockchain_id`` / ``time_unit_id`` foreign keys). The related
+    blockchain and time-unit names are surfaced instead of their ids.
+    """
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int
+    blockchain_name: str = Field(
+        validation_alias=AliasPath("blockchain", "name"),
+    )
+    time_unit: str = Field(
+        validation_alias=AliasPath("time_unit", "name"),
+    )
+    raw_fee_value: Decimal
+    usd_value: Decimal | None = None
+    avg_fee: Decimal | None = None
+    median_fee: Decimal | None = None
+    min_fee: Decimal | None = None
+    max_fee: Decimal | None = None
+    sample_count: int
+    previous_value: Decimal | None = None
+    status: FeeStatus
+    change_percentage: Decimal | None = None
+    block_number: int | None = None
+    recorded_at: datetime
+
+
 __all__ = [
     "FeeSnapshotBase",
     "FeeSnapshotCreate",
+    "FeeSnapshotPublic",
     "FeeSnapshotRead",
     "FeeSnapshotUpdate",
 ]

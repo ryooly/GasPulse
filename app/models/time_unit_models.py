@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 
 class TimeUnitName(str, enum.Enum):
-    MINUTE = "minute"
     HOUR = "hour"
     DAY = "day"
     WEEK = "week"

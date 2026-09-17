@@ -99,3 +99,6 @@ class FeeSnapshot(Base):
 
 
 __all__ = ["FeeSnapshot", "FeeStatus"]
+
+
+# setiap blok transaksi yang berhasil diraih akan melalui automation engine, yang mana itu menyertarakan beberap hal antara lain (get value, kalkulasi dengan blok sbeelumnya yang ada disini, recreate block baru kemduain di push ke dalam sini, apabila users hendak mengambil maka dia akan mengambil dari data terbarunnya gitu yang merepresentasikan waktu saat ini atau kita membuat mesin kalkulasi waktu untuk memastikan bahwa ini masi relevan untuk ditmapilkan sekarang)
