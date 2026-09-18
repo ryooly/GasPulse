@@ -12,11 +12,11 @@ class FeeSnapshotRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_by_blockchain_and_time_unit(
+    def get_latest_by_blockchain_and_time_unit(
         self,
         blockchain_name: str,
         time_unit: TimeUnitName,
-    ) -> list[FeeSnapshot]:
+    ) -> FeeSnapshot | None:
         stmt = (
             select(FeeSnapshot)
             .join(Blockchain, FeeSnapshot.blockchain_id == Blockchain.id)
@@ -28,8 +28,13 @@ class FeeSnapshotRepository:
                 selectinload(FeeSnapshot.time_unit),
             )
             .order_by(FeeSnapshot.recorded_at.desc())
+            .limit(1)
         )
-        return list(self._session.scalars(stmt).all())
+        return self._session.scalars(stmt).first()
 
 
 __all__ = ["FeeSnapshotRepository"]
+
+
+
+# kita akan menambahkan semacam table baru untuk menyimpan setiap input sehingga itu akan memebtnuk semacam chart

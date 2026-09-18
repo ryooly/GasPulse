@@ -15,7 +15,7 @@ class FeeSnapshotController:
         blockchain_name: str,
         time_unit: TimeUnitName,
     ) -> list[FeeSnapshotPublic]:
-        snapshots = self._repository.list_by_blockchain_and_time_unit(
+        snapshots = self._repository.get_latest_by_blockchain_and_time_unit(
             blockchain_name, time_unit,
         ) # chnage use servie
         return 
