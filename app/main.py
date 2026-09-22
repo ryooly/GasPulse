@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 import app.models
+from app.modules.api.fee_chart import router as fee_chart_router
 from app.modules.api.fee_snapshots import router as fee_snapshots_router
 from db.base import Base
 from db.session import engine
@@ -25,6 +26,7 @@ app = FastAPI(
 )
 
 app.include_router(fee_snapshots_router)
+app.include_router(fee_chart_router)
 
 
 @app.get("/", tags=["health"])
