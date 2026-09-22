@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.base import Base, utcnow
 
 if TYPE_CHECKING:
+    from app.models.fee_chart_models import FeeChartData
     from app.models.fee_snapshot_models import FeeSnapshot
 
 
@@ -48,6 +49,10 @@ class Blockchain(Base):
     )
 
     fee_snapshots: Mapped[list[FeeSnapshot]] = relationship(
+        back_populates="blockchain",
+        cascade="all, delete-orphan",
+    )
+    fee_chart_data: Mapped[list[FeeChartData]] = relationship(
         back_populates="blockchain",
         cascade="all, delete-orphan",
     )

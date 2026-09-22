@@ -9,9 +9,6 @@ from app.models.fee_snapshot_models import FeeSnapshot
 from app.models.time_unit_models import TimeUnit, TimeUnitName
 from app.schemas.fee_snapshot_schemas import FeeSnapshotPublic
 from db.session import get_db
-from app.modules.controllers.fee_snapshot_controller import FeeSnapshotController
-
-controller = FeeSnapshotController(repository=FeeSnapshotRepository())
 
 router = APIRouter(tags=["fees"])
 
@@ -23,7 +20,7 @@ def get_hour_fees(
     ),
     db: Session = Depends(get_db),
 ) -> list[FeeSnapshot]:
-    return controller.get_hourly_fees(blockchain)
+    return 
 
 
 @router.get("/day", response_model=list[FeeSnapshotPublic])
@@ -33,7 +30,7 @@ def get_day_fees(
     ),
     db: Session = Depends(get_db),
 ) -> list[FeeSnapshot]:
-    return controller.get_daily_fees(blockchain)
+    return 
 
 
 @router.get("/week", response_model=list[FeeSnapshotPublic])
@@ -43,7 +40,7 @@ def get_week_fees(
     ),
     db: Session = Depends(get_db),
 ) -> list[FeeSnapshot]:
-    return controller.get_weekly_fees(blockchain)
+    return 
 
 
 __all__ = ["router"]

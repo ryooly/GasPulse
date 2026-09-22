@@ -8,12 +8,14 @@ all tables (required before ``create_all()`` / mapper configuration).
 from db.base import Base, utcnow
 
 from app.models.blockchains import Blockchain
+from app.models.fee_chart_models import FeeChartData
 from app.models.fee_snapshot_models import FeeSnapshot, FeeStatus
 from app.models.time_unit_models import TimeUnit, TimeUnitName
 
 __all__ = [
     "Base",
     "Blockchain",
+    "FeeChartData",
     "FeeSnapshot",
     "FeeStatus",
     "TimeUnit",
