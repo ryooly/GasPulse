@@ -1,0 +1,7 @@
+# Extra dependencies for the dev-infra real-data setup ONLY.
+# Installed separately from the backend's requirements.txt so the backend stays
+# untouched and this folder remains safe to delete.
+#
+#   pip install -r dev-infra/requirements.txt
+alembic>=1.13
+psycopg[binary]>=3.1
