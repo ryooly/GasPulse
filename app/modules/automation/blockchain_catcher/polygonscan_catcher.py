@@ -11,11 +11,6 @@ from app.modules.automation.blockchain_catcher.base_catcher import (
     ScannerAPIError,
 )
 
-# ==============================================================================
-# Polygonscan Scanner Configuration & Placeholders
-# ==============================================================================
-# Replace these placeholders with your actual Polygonscan API URL and API key,
-# or provide them via environment variables.
 POLYGONSCAN_API_URL: str = os.getenv(
     "POLYGONSCAN_API_URL",
     "https://api.polygonscan.com/api",
@@ -27,11 +22,6 @@ POLYGONSCAN_API_KEY: str = os.getenv(
 
 
 class PolygonscanCatcher(BaseBlockchainCatcher):
-    """Blockchain catcher for Polygon (POL) using Polygonscan API.
-
-    Captures blocks within a specified timeframe (HOURS/DAYS/WEEKS)
-    and inserts computed gas fee snapshots into the database table.
-    """
 
     BLOCKCHAIN_NAME: str = "Polygon"
     BLOCKCHAIN_SYMBOL: str = "POL"

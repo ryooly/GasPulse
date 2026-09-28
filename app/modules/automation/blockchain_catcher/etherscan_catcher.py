@@ -11,11 +11,6 @@ from app.modules.automation.blockchain_catcher.base_catcher import (
     ScannerAPIError,
 )
 
-# ==============================================================================
-# Etherscan Scanner Configuration & Placeholders
-# ==============================================================================
-# Replace these placeholders with your actual Etherscan API URL and API key,
-# or provide them via environment variables.
 ETHERSCAN_API_URL: str = os.getenv(
     "ETHERSCAN_API_URL",
     "https://api.etherscan.io/api",
@@ -27,11 +22,6 @@ ETHERSCAN_API_KEY: str = os.getenv(
 
 
 class EtherscanCatcher(BaseBlockchainCatcher):
-    """Blockchain catcher for Ethereum using Etherscan API.
-
-    Captures blocks within a specified timeframe (HOURS/DAYS/WEEKS)
-    and inserts computed gas fee snapshots into the database table.
-    """
 
     BLOCKCHAIN_NAME: str = "Ethereum"
     BLOCKCHAIN_SYMBOL: str = "ETH"

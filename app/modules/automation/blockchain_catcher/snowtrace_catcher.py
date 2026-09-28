@@ -11,11 +11,6 @@ from app.modules.automation.blockchain_catcher.base_catcher import (
     ScannerAPIError,
 )
 
-# ==============================================================================
-# Snowtrace (Avalanche) Scanner Configuration & Placeholders
-# ==============================================================================
-# Replace these placeholders with your actual Snowtrace API URL and API key,
-# or provide them via environment variables.
 SNOWTRACE_API_URL: str = os.getenv(
     "SNOWTRACE_API_URL",
     "https://api.snowtrace.io/api",
@@ -27,11 +22,6 @@ SNOWTRACE_API_KEY: str = os.getenv(
 
 
 class SnowtraceCatcher(BaseBlockchainCatcher):
-    """Blockchain catcher for Avalanche (C-Chain) using Snowtrace API.
-
-    Captures blocks within a specified timeframe (HOURS/DAYS/WEEKS)
-    and inserts computed gas fee snapshots into the database table.
-    """
 
     BLOCKCHAIN_NAME: str = "Avalanche"
     BLOCKCHAIN_SYMBOL: str = "AVAX"

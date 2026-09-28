@@ -11,11 +11,6 @@ from app.modules.automation.blockchain_catcher.base_catcher import (
     ScannerAPIError,
 )
 
-# ==============================================================================
-# BscScan Scanner Configuration & Placeholders
-# ==============================================================================
-# Replace these placeholders with your actual BscScan API URL and API key,
-# or provide them via environment variables.
 BSCSCAN_API_URL: str = os.getenv(
     "BSCSCAN_API_URL",
     "https://api.bscscan.com/api",
@@ -27,11 +22,6 @@ BSCSCAN_API_KEY: str = os.getenv(
 
 
 class BscScanCatcher(BaseBlockchainCatcher):
-    """Blockchain catcher for BNB Smart Chain using BscScan API.
-
-    Captures blocks within a specified timeframe (HOURS/DAYS/WEEKS)
-    and inserts computed gas fee snapshots into the database table.
-    """
 
     BLOCKCHAIN_NAME: str = "BNB Smart Chain"
     BLOCKCHAIN_SYMBOL: str = "BNB"
@@ -62,7 +52,6 @@ class BscScanCatcher(BaseBlockchainCatcher):
         )
 
     def get_gas_oracle(self) -> dict[str, Any]:
-        """Fetch current gas price estimates directly from BscScan gas oracle."""
         params = {
             "module": "gastracker",
             "action": "gasoracle",

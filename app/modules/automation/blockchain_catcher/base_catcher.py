@@ -320,7 +320,6 @@ class BaseBlockchainCatcher:
         previous_fee_value: Decimal | None = None,
         usd_price: Decimal | None = None,
     ) -> dict[str, Any]:
-        """Compute fee metrics (avg, median, min, max, change_percentage, status)."""
         if not captured_blocks:
             raise ValueError("captured_blocks cannot be empty")
 
@@ -366,6 +365,7 @@ class BaseBlockchainCatcher:
         }
 
 
+# repository is nedeed
     def ensure_blockchain_record(self, db: Session) -> Blockchain:
         stmt = select(Blockchain).where(
             func.lower(Blockchain.name) == self.blockchain_name.strip().lower()

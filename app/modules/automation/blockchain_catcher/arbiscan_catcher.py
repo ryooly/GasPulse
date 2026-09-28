@@ -11,11 +11,7 @@ from app.modules.automation.blockchain_catcher.base_catcher import (
     ScannerAPIError,
 )
 
-# ==============================================================================
-# Arbiscan Scanner Configuration & Placeholders
-# ==============================================================================
-# Replace these placeholders with your actual Arbiscan API URL and API key,
-# or provide them via environment variables.
+
 ARBISCAN_API_URL: str = os.getenv(
     "ARBISCAN_API_URL",
     "https://api.arbiscan.io/api",
@@ -27,11 +23,6 @@ ARBISCAN_API_KEY: str = os.getenv(
 
 
 class ArbiscanCatcher(BaseBlockchainCatcher):
-    """Blockchain catcher for Arbitrum using Arbiscan API.
-
-    Captures blocks within a specified timeframe (HOURS/DAYS/WEEKS)
-    and inserts computed gas fee snapshots into the database table.
-    """
 
     BLOCKCHAIN_NAME: str = "Arbitrum"
     BLOCKCHAIN_SYMBOL: str = "ARB"
@@ -62,7 +53,6 @@ class ArbiscanCatcher(BaseBlockchainCatcher):
         )
 
     def get_gas_oracle(self) -> dict[str, Any]:
-        """Fetch current gas price estimates directly from Arbiscan gas oracle."""
         params = {
             "module": "gastracker",
             "action": "gasoracle",
