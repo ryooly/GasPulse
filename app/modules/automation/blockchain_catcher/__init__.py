@@ -1,57 +1,49 @@
-from __future__ import annotations
+"""Blockchain scanner catchers package.
 
-from app.modules.automation.blockchain_catcher.arbiscan_catcher import (
-    ARBISCAN_API_KEY,
-    ARBISCAN_API_URL,
-    ArbiscanCatcher,
+Public surface: the base engine, the concrete per-chain catchers, shared
+exceptions, the ``CapturedBlock`` DTO, and ready-to-use singletons.
+"""
+
+from app.modules.automation.blockchain_catcher.base_client import (
+    BaseScannerClient,
+    ScannerConfig,
 )
 from app.modules.automation.blockchain_catcher.base_catcher import (
     BaseBlockchainCatcher,
-    BlockchainCatcherError,
     CapturedBlock,
+)
+from app.modules.automation.blockchain_catcher.exceptions import (
     InvalidTimeframeError,
     ScannerAPIError,
 )
-from app.modules.automation.blockchain_catcher.bscscan_catcher import (
-    BSCSCAN_API_KEY,
-    BSCSCAN_API_URL,
+from app.modules.automation.blockchain_catcher.scanners import (
+    ArbiscanCatcher,
     BscScanCatcher,
-)
-from app.modules.automation.blockchain_catcher.etherscan_catcher import (
-    ETHERSCAN_API_KEY,
-    ETHERSCAN_API_URL,
     EtherscanCatcher,
-)
-from app.modules.automation.blockchain_catcher.polygonscan_catcher import (
-    POLYGONSCAN_API_KEY,
-    POLYGONSCAN_API_URL,
     PolygonscanCatcher,
-)
-from app.modules.automation.blockchain_catcher.snowtrace_catcher import (
-    SNOWTRACE_API_KEY,
-    SNOWTRACE_API_URL,
     SnowtraceCatcher,
+    arbiscan_catcher,
+    bscscan_catcher,
+    etherscan_catcher,
+    polygonscan_catcher,
+    snowtrace_catcher,
 )
 
 __all__ = [
-    "ARBISCAN_API_KEY",
-    "ARBISCAN_API_URL",
-    "BSCSCAN_API_KEY",
-    "BSCSCAN_API_URL",
-    "ETHERSCAN_API_KEY",
-    "ETHERSCAN_API_URL",
-    "POLYGONSCAN_API_KEY",
-    "POLYGONSCAN_API_URL",
-    "SNOWTRACE_API_KEY",
-    "SNOWTRACE_API_URL",
-    "ArbiscanCatcher",
+    "BaseScannerClient",
+    "ScannerConfig",
     "BaseBlockchainCatcher",
-    "BlockchainCatcherError",
-    "BscScanCatcher",
     "CapturedBlock",
-    "EtherscanCatcher",
     "InvalidTimeframeError",
-    "PolygonscanCatcher",
     "ScannerAPIError",
+    "EtherscanCatcher",
+    "PolygonscanCatcher",
+    "BscScanCatcher",
+    "ArbiscanCatcher",
     "SnowtraceCatcher",
+    "etherscan_catcher",
+    "polygonscan_catcher",
+    "bscscan_catcher",
+    "arbiscan_catcher",
+    "snowtrace_catcher",
 ]
