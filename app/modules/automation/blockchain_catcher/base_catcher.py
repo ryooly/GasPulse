@@ -72,6 +72,8 @@ class BaseBlockchainCatcher(BaseScannerClient):
                 config.api_key = api_key
         super().__init__(config, session=session)
 
+# tambahakan algorithm ketika config gak ada api key sebiknya gimana dan tambahkan algorithm nanti dengan mebandingkan dengan namaya tanpa perlu api url dri params alias hapus aja 
+
 
     def resolve_timeframe(self, timeframe) -> tuple[TimeUnitName, int]:
         if isinstance(timeframe, TimeUnitName):
@@ -85,7 +87,7 @@ class BaseBlockchainCatcher(BaseScannerClient):
 
     def get_latest_block_number(self) -> int:
         data = self.request({"module": "proxy", "action": "eth_blockNumber"})
-        return int(data["result"], 16)
+        return int(data["result"], 16) # ini adlaah blok permintaan nanti di design sendiri sehingga bisa di pake non eth
 
     def get_block_number_by_timestamp(self, timestamp: datetime, closest: str = "before") -> int:
         ts = int(timestamp.timestamp())
