@@ -8,19 +8,12 @@ class _EtherscanCompatibleCatcher(BaseBlockchainCatcher):
 
     env_prefix: str = ""
 
-    def __init__(self, api_url: str | None = None, api_key: str | None = None, session=None, **config_kwargs):
+    def __init__(self, session=None, **config_kwargs):
         config = ScannerConfig.from_env(
             env_prefix=self.env_prefix,
             default_api_url=self.default_api_url,
             default_api_key=self.default_api_key,
         )
-        if api_url is not None:
-            config.api_url = api_url
-        if api_key is not None:
-            config.api_key = api_key
-        for key, value in config_kwargs.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
         super().__init__(config=config, session=session)
 
 
@@ -83,3 +76,13 @@ __all__ = [
     "arbiscan_catcher",
     "snowtrace_catcher",
 ]
+
+
+
+# Belumm di proses lebih lanjut harusnya dia ini langusng return gitu dan masukan ke dalam fungsi 
+
+
+# Hapus inputs params soalnya gak penting 
+
+
+# Tambahkan env untuk key api url
