@@ -201,6 +201,8 @@ class BaseBlockchainCatcher(BaseScannerClient):
             return ordered[mid]
         return (ordered[mid - 1] + ordered[mid]) / Decimal(2)
 
+
+### Repo Funcition 
     def capture_and_insert(
         self,
         db,
