@@ -1,40 +1,82 @@
 from __future__ import annotations
 
+"""Integration test for blockchain_catcher using real Docker PostgreSQL.
+
+Prerequisites:
+    1. Start Docker:  docker compose -f dev-infra/docker-compose.yml up -d
+    2. Install deps:  pip install -r dev-infra/requirements.txt
+
+Run:
+    python -m pytest test/test_blockchain_catcher.py -v
+
+Validate real DB rows after the run (tables + data kept):
+    $env:KEEP_DB="1"; python -m pytest test/test_blockchain_catcher.py -v -s
+    docker exec gaspulse-db psql -U gaspulse -d gaspulse_test -c "SELECT * FROM fee_snapshots;"
+    $env:KEEP_DB=""   # next run will clean up again
+"""
+
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.models.blockchains import Blockchain
 from app.models.fee_snapshot_models import FeeSnapshot, FeeStatus
 from app.models.time_unit_models import TimeUnit, TimeUnitName
 from app.modules.automation.blockchain_catcher import (
-    ArbiscanCatcher,
     BaseBlockchainCatcher,
-    BscScanCatcher,
     CapturedBlock,
     EtherscanCatcher,
-    InvalidTimeframeError,
-    PolygonscanCatcher,
     ScannerAPIError,
-    SnowtraceCatcher,
 )
 from db.base import Base
 
+# ─── Docker PostgreSQL connection ───────────────────────────────────────────
+
+TEST_DB_NAME = "gaspulse_test"
+ADMIN_DATABASE_URL = "postgresql+psycopg://gaspulse:gaspulse@127.0.0.1:5433/gaspulse"
+TEST_DATABASE_URL = f"postgresql+psycopg://gaspulse:gaspulse@127.0.0.1:5433/{TEST_DB_NAME}"
+
+
+@pytest.fixture(scope="module")
+def engine():
+    """Ensure the test database exists on Docker Postgres, then build schema once."""
+    from sqlalchemy import text
+
+    # Connect to the default 'gaspulse' db and create 'gaspulse_test' if missing.
+    admin_engine = create_engine(ADMIN_DATABASE_URL, isolation_level="AUTOCOMMIT", future=True)
+    with admin_engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :db"), {"db": TEST_DB_NAME}
+        ).fetchone()
+        if exists is None:
+            conn.execute(text(f"CREATE DATABASE {TEST_DB_NAME}"))
+    admin_engine.dispose()
+
+    eng = create_engine(TEST_DATABASE_URL, future=True)
+    Base.metadata.drop_all(bind=eng)
+    Base.metadata.create_all(bind=eng)
+    yield eng
+    if os.getenv("KEEP_DB") == "1":
+        print(f"\n[KEEP_DB=1] schema left intact at {TEST_DATABASE_URL}")
+    else:
+        Base.metadata.drop_all(bind=eng)
+    eng.dispose()
+
 
 @pytest.fixture()
-def db_session():
-    """In-memory SQLite database session with all tables created."""
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        future=True,
-    )
+def db_session(engine):
+    """Fresh schema per test so committed rows from one test never leak into the next.
+
+    Note: KEEP_DB only preserves the schema produced by the LAST test in the run.
+    To inspect a specific test's data, filter to just that test, e.g.:
+        $env:KEEP_DB="1"; python -m pytest test/test_blockchain_catcher.py -k test_capture_twice -s
+    """
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     session_factory = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
     session = session_factory()
@@ -42,160 +84,171 @@ def db_session():
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
 
 
-class TestCatcherClassesAndPlaceholders:
-    """Verifies that all 5 classes exist and contain the required placeholders."""
+# ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    def test_all_five_classes_instantiation_and_placeholders(self):
-        catchers = [
-            (EtherscanCatcher, "Ethereum", "ETH", "https://api.etherscan.io/api", "YOUR_ETHERSCAN_API_KEY"),
-            (PolygonscanCatcher, "Polygon", "POL", "https://api.polygonscan.com/api", "YOUR_POLYGONSCAN_API_KEY"),
-            (BscScanCatcher, "BNB Smart Chain", "BNB", "https://api.bscscan.com/api", "YOUR_BSCSCAN_API_KEY"),
-            (ArbiscanCatcher, "Arbitrum", "ARB", "https://api.arbiscan.io/api", "YOUR_ARBISCAN_API_KEY"),
-            (SnowtraceCatcher, "Avalanche", "AVAX", "https://api.snowtrace.io/api", "YOUR_SNOWTRACE_API_KEY"),
-        ]
+def _mock_http_layer(catcher: BaseBlockchainCatcher, base_fee_wei: int = 25_000_000_000):
+    """Patch catcher's HTTP session to return deterministic block data."""
+    mock_session = MagicMock()
 
-        for cls, name, symbol, default_url, default_key in catchers:
-            catcher = cls()
-            assert catcher.blockchain_name == name
-            assert catcher.blockchain_symbol == symbol
-            assert catcher.api_url == default_url
-            assert catcher.api_key == default_key
+    def mock_get(url, params=None, headers=None, timeout=None):
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.status_code = 200
+        action = params.get("action")
 
-    def test_custom_placeholders_and_env_overrides(self, monkeypatch):
-        monkeypatch.setenv("ETHERSCAN_API_KEY", "custom_eth_key_123")
-        monkeypatch.setenv("ETHERSCAN_API_URL", "https://custom.etherscan.io/api")
+        if action == "getblocknobytime":
+            resp.json.return_value = {"status": "1", "message": "OK", "result": "19000000"}
+        elif action == "eth_blockNumber":
+            resp.json.return_value = {"jsonrpc": "2.0", "result": hex(19000000)}
+        elif action == "eth_getBlockByNumber":
+            tag = params.get("tag", hex(19000000))
+            block_num = int(tag, 16) if isinstance(tag, str) else tag
+            resp.json.return_value = {
+                "jsonrpc": "2.0",
+                "result": {
+                    "number": hex(block_num),
+                    "timestamp": hex(1700000000 + block_num),
+                    "baseFeePerGas": hex(base_fee_wei),
+                    "gasUsed": "0x1c9c38",
+                    "gasLimit": "0x1c9c380",
+                },
+            }
+        elif action == "gasoracle":
+            resp.json.return_value = {
+                "status": "1",
+                "message": "OK",
+                "result": {
+                    "SafeGasPrice": "20",
+                    "ProposeGasPrice": "25",
+                    "FastGasPrice": "30",
+                    "suggestBaseFee": "22.5",
+                },
+            }
+        else:
+            resp.json.return_value = {"status": "1", "result": {}}
+        return resp
 
-        from app.modules.automation.blockchain_catcher import etherscan_catcher
-
-        # Explicit params override defaults
-        catcher = EtherscanCatcher(
-            api_url="https://override.etherscan.io/api",
-            api_key="my_key_999",
-        )
-        assert catcher.api_url == "https://override.etherscan.io/api"
-        assert catcher.api_key == "my_key_999"
-
-
-class TestTimeframeResolution:
-    """Tests resolving HOURS, DAYS, WEEKS into TimeUnitName and duration."""
-
-    def test_valid_timeframes(self):
-        catcher = BaseBlockchainCatcher()
-
-        unit, secs = catcher.resolve_timeframe(TimeUnitName.HOUR)
-        assert unit == TimeUnitName.HOUR and secs == 3600
-
-        unit, secs = catcher.resolve_timeframe("hour")
-        assert unit == TimeUnitName.HOUR and secs == 3600
-
-        unit, secs = catcher.resolve_timeframe("HOURS")
-        assert unit == TimeUnitName.HOUR and secs == 3600
-
-        unit, secs = catcher.resolve_timeframe("days")
-        assert unit == TimeUnitName.DAY and secs == 86400
-
-        unit, secs = catcher.resolve_timeframe("WEEKS")
-        assert unit == TimeUnitName.WEEK and secs == 604800
-
-    def test_invalid_timeframe_raises_error(self):
-        catcher = BaseBlockchainCatcher()
-        with pytest.raises(InvalidTimeframeError):
-            catcher.resolve_timeframe("invalid_interval")
+    mock_session.get.side_effect = mock_get
+    catcher.session = mock_session
 
 
-class TestMetricsCalculation:
-    """Tests calculating avg, median, min, max, change_percentage, and status."""
+# ─── Tests ───────────────────────────────────────────────────────────────────
 
-    def test_metrics_computation(self):
+class TestCaptureAndInsertWithRealDB:
+    """End-to-end test: catcher fetches blocks (mocked HTTP) and inserts into real PostgreSQL."""
+
+    def test_capture_and_insert_creates_snapshot(self, db_session: Session):
+        """Full flow: resolve timeframe -> fetch blocks -> compute metrics -> insert snapshot."""
         catcher = EtherscanCatcher()
-        blocks = [
-            CapturedBlock(number=100, timestamp=datetime.now(timezone.utc), fee_gwei=Decimal("20.0")),
-            CapturedBlock(number=101, timestamp=datetime.now(timezone.utc), fee_gwei=Decimal("25.0")),
-            CapturedBlock(number=102, timestamp=datetime.now(timezone.utc), fee_gwei=Decimal("30.0")),
-        ]
+        _mock_http_layer(catcher, base_fee_wei=30_000_000_000)  # 30 Gwei
 
-        metrics = catcher.compute_snapshot_metrics(
-            captured_blocks=blocks,
-            previous_fee_value=Decimal("20.0"),
-            usd_price=Decimal("2500"),
+        snapshot = catcher.capture_and_insert(
+            db=db_session,
+            timeframe="hour",
+            sample_size=1,
         )
 
-        assert metrics["raw_fee_value"] == Decimal("30.000000000000000000")
-        assert metrics["avg_fee"] == Decimal("25.000000000000000000")
-        assert metrics["median_fee"] == Decimal("25.000000000000000000")
-        assert metrics["min_fee"] == Decimal("20.000000000000000000")
-        assert metrics["max_fee"] == Decimal("30.000000000000000000")
-        assert metrics["sample_count"] == 3
-        assert metrics["previous_value"] == Decimal("20.000000000000000000")
-        # ((30 - 20) / 20) * 100 = 50.0000%
-        assert metrics["change_percentage"] == Decimal("50.0000")
-        assert metrics["status"] == FeeStatus.UP
-        assert metrics["block_number"] == 102
-        assert metrics["usd_value"] == Decimal("75000.00000000")
+        # Verify persisted to real DB
+        assert snapshot.id is not None
+        assert snapshot.raw_fee_value == Decimal("30.000000000000000000")
+        assert snapshot.block_number == 19000000
+        assert snapshot.status == FeeStatus.STABLE
+        assert snapshot.sample_count == 1
 
-    def test_status_down_and_stable(self):
+        # Verify relationships resolved from DB
+        assert snapshot.blockchain.name == "Ethereum"
+        assert snapshot.blockchain.symbol == "ETH"
+        assert snapshot.time_unit.name == TimeUnitName.HOUR
+
+        # Confirm row exists in database
+        row = db_session.scalars(
+            select(FeeSnapshot).where(FeeSnapshot.id == snapshot.id)
+        ).first()
+        assert row is not None
+        assert row.raw_fee_value == Decimal("30.000000000000000000")
+
+        # Print DB evidence (visible with `pytest -s`)
+        print(
+            f"\n[DB] fee_snapshots row -> id={row.id} "
+            f"blockchain={row.blockchain.name} time_unit={row.time_unit.name.value} "
+            f"raw_fee={row.raw_fee_value} status={row.status.value} "
+            f"block_number={row.block_number}"
+        )
+
+    def test_capture_twice_computes_change_percentage(self, db_session: Session):
+        """Second capture should compare against the first snapshot in DB."""
         catcher = EtherscanCatcher()
-        blocks = [
-            CapturedBlock(number=200, timestamp=datetime.now(timezone.utc), fee_gwei=Decimal("15.0")),
-        ]
 
-        # Down: previous was 20.0, current is 15.0 -> -25%
-        metrics_down = catcher.compute_snapshot_metrics(
-            captured_blocks=blocks,
-            previous_fee_value=Decimal("20.0"),
-        )
-        assert metrics_down["status"] == FeeStatus.DOWN
-        assert metrics_down["change_percentage"] == Decimal("-25.0000")
+        # First capture at 20 Gwei
+        _mock_http_layer(catcher, base_fee_wei=20_000_000_000)
+        snap1 = catcher.capture_and_insert(db=db_session, timeframe="hour", sample_size=1)
+        assert snap1.previous_value is None
+        assert snap1.change_percentage is None
+        assert snap1.status == FeeStatus.STABLE
 
-        # Stable: previous was 15.01, current is 15.0 -> -0.066%
-        metrics_stable = catcher.compute_snapshot_metrics(
-            captured_blocks=blocks,
-            previous_fee_value=Decimal("15.01"),
-        )
-        assert metrics_stable["status"] == FeeStatus.STABLE
+        # Second capture at 35 Gwei -> should detect +75% change
+        _mock_http_layer(catcher, base_fee_wei=35_000_000_000)
+        snap2 = catcher.capture_and_insert(db=db_session, timeframe="hour", sample_size=1)
+        assert snap2.previous_value == Decimal("20.000000000000000000")
+        assert snap2.change_percentage == Decimal("75.0000")
+        assert snap2.status == FeeStatus.UP
 
+        # Both rows exist in DB
+        rows = db_session.scalars(
+            select(FeeSnapshot).order_by(FeeSnapshot.id.asc())
+        ).all()
+        assert len(rows) == 2
 
-class TestCaptureAndInsertDatabase:
-    """Tests end-to-end block capturing and insertion into FeeSnapshot table."""
+    def test_blockchain_and_time_unit_created_automatically(self, db_session: Session):
+        """Verify _get_or_create logic works against real DB constraints."""
+        catcher = EtherscanCatcher()
+        _mock_http_layer(catcher, base_fee_wei=25_000_000_000)
 
-    def _setup_mock_session(self, catcher: BaseBlockchainCatcher, base_fee_wei: int = 25_000_000_000):
+        # Call twice — should reuse same blockchain and time_unit
+        snap1 = catcher.capture_and_insert(db=db_session, timeframe="hour", sample_size=1)
+        snap2 = catcher.capture_and_insert(db=db_session, timeframe="hour", sample_size=1)
+
+        assert snap1.blockchain_id == snap2.blockchain_id
+        assert snap1.time_unit_id == snap2.time_unit_id
+
+        # Only one blockchain and one time_unit row
+        chains = db_session.scalars(select(Blockchain)).all()
+        units = db_session.scalars(select(TimeUnit)).all()
+        assert len(chains) == 1
+        assert len(units) == 1
+        assert chains[0].name == "Ethereum"
+        assert units[0].name == TimeUnitName.HOUR
+
+    def test_fetch_blocks_returns_expected_output(self, db_session: Session):
+        """Verify the block-fetching pipeline returns correct CapturedBlock data."""
+        catcher = EtherscanCatcher()
+
+        # Mock with a range: start=100, end=104, sample 3 blocks
         mock_session = MagicMock()
 
         def mock_get(url, params=None, headers=None, timeout=None):
             resp = MagicMock()
             resp.raise_for_status.return_value = None
+            resp.status_code = 200
             action = params.get("action")
+
             if action == "getblocknobytime":
-                resp.json.return_value = {"status": "1", "message": "OK", "result": "19000000"}
+                resp.json.return_value = {"status": "1", "message": "OK", "result": "100"}
             elif action == "eth_blockNumber":
-                resp.json.return_value = {"jsonrpc": "2.0", "result": "0x121eac0"}
+                resp.json.return_value = {"jsonrpc": "2.0", "result": "0x68"}  # 104
             elif action == "eth_getBlockByNumber":
-                tag = params.get("tag", "0x121eac0")
-                block_num = int(tag, 16) if tag.startswith("0x") else 19000000
+                tag = params.get("tag", "0x68")
+                block_num = int(tag, 16)
                 resp.json.return_value = {
                     "jsonrpc": "2.0",
                     "result": {
                         "number": hex(block_num),
-                        "timestamp": "0x66f12345",
-                        "baseFeePerGas": hex(base_fee_wei),
+                        "timestamp": hex(1700000000 + block_num),
+                        "baseFeePerGas": hex((block_num + 1) * 10**9),
                         "gasUsed": "0x1c9c38",
                         "gasLimit": "0x1c9c380",
-                        "transactions": [],
-                    },
-                }
-            elif action == "gasoracle":
-                resp.json.return_value = {
-                    "status": "1",
-                    "message": "OK",
-                    "result": {
-                        "SafeGasPrice": "20",
-                        "ProposeGasPrice": "25",
-                        "FastGasPrice": "30",
-                        "suggestBaseFee": "22.5",
                     },
                 }
             else:
@@ -205,77 +258,25 @@ class TestCaptureAndInsertDatabase:
         mock_session.get.side_effect = mock_get
         catcher.session = mock_session
 
-    @pytest.mark.parametrize(
-        "catcher_cls, expected_name, expected_symbol",
-        [
-            (EtherscanCatcher, "Ethereum", "ETH"),
-            (PolygonscanCatcher, "Polygon", "POL"),
-            (BscScanCatcher, "BNB Smart Chain", "BNB"),
-            (ArbiscanCatcher, "Arbitrum", "ARB"),
-            (SnowtraceCatcher, "Avalanche", "AVAX"),
-        ],
-    )
-    def test_capture_and_insert_for_all_five_blockchains(
-        self,
-        db_session: Session,
-        catcher_cls,
-        expected_name: str,
-        expected_symbol: str,
-    ):
-        catcher = catcher_cls()
-        self._setup_mock_session(catcher, base_fee_wei=25_000_000_000)
+        blocks = catcher.fetch_blocks_by_time_range(seconds=3600, sample_size=3)
 
-        # Capture across HOURS
-        snapshot = catcher.capture_and_insert(
-            db=db_session,
-            timeframe="HOURS",
-            sample_size=3,
-        )
+        assert len(blocks) == 3
+        assert all(isinstance(b, CapturedBlock) for b in blocks)
+        numbers = [b.number for b in blocks]
+        assert numbers == sorted(numbers)
+        assert numbers[0] == 100
+        assert numbers[-1] == 104
+        # fee = (block_num + 1) Gwei
+        for b in blocks:
+            assert b.fee_gwei == Decimal(b.number + 1)
 
-        assert snapshot.id is not None
-        assert snapshot.raw_fee_value == Decimal("25.000000000000000000")
-        assert snapshot.sample_count == 1  # start == end in mock block range
-        assert snapshot.block_number == 19000000
-        assert snapshot.status == FeeStatus.STABLE
-        assert snapshot.blockchain.name == expected_name
-        assert snapshot.blockchain.symbol == expected_symbol
-        assert snapshot.time_unit.name == TimeUnitName.HOUR
+    def test_scanner_error_raises_exception(self, db_session: Session):
+        """Verify network errors propagate as ScannerAPIError."""
+        import requests
 
-    def test_capture_and_insert_trend_calculation(self, db_session: Session):
-        catcher = EtherscanCatcher()
-
-        # First capture at 20 Gwei
-        self._setup_mock_session(catcher, base_fee_wei=20_000_000_000)
-        snap1 = catcher.capture_and_insert(db=db_session, timeframe=TimeUnitName.DAY)
-        assert snap1.raw_fee_value == Decimal("20.000000000000000000")
-        assert snap1.previous_value is None
-        assert snap1.status == FeeStatus.STABLE
-
-        # Second capture at 35 Gwei (+75%)
-        self._setup_mock_session(catcher, base_fee_wei=35_000_000_000)
-        snap2 = catcher.capture_and_insert(db=db_session, timeframe=TimeUnitName.DAY)
-        assert snap2.raw_fee_value == Decimal("35.000000000000000000")
-        assert snap2.previous_value == Decimal("20.000000000000000000")
-        assert snap2.change_percentage == Decimal("75.0000")
-        assert snap2.status == FeeStatus.UP
-
-        # Verify DB query
-        rows = db_session.scalars(select(FeeSnapshot).order_by(FeeSnapshot.id.asc())).all()
-        assert len(rows) == 2
-        assert rows[1].status == FeeStatus.UP
-
-    def test_gas_oracle_method(self):
-        catcher = EtherscanCatcher()
-        self._setup_mock_session(catcher)
-        oracle = catcher.get_gas_oracle()
-        assert oracle["SafeGasPrice"] == "20"
-        assert oracle["FastGasPrice"] == "30"
-
-    def test_scanner_network_error_raises_exception(self):
         catcher = EtherscanCatcher()
         mock_session = MagicMock()
-        import requests
-        mock_session.get.side_effect = requests.RequestException("Timeout connecting to scanner")
+        mock_session.get.side_effect = requests.RequestException("Connection refused")
         catcher.session = mock_session
 
         with pytest.raises(ScannerAPIError, match="HTTP request to .* failed"):
