@@ -4,11 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import select
-
-from app.models.blockchains import Blockchain
 from app.models.fee_snapshot_models import FeeSnapshot, FeeStatus
-from app.models.time_unit_models import TimeUnit, TimeUnitName
+from app.models.time_unit_models import TimeUnitName
 from app.modules.automation.blockchain_catcher.base_client import (
     BaseScannerClient,
     ScannerConfig,
@@ -17,6 +14,7 @@ from app.modules.automation.blockchain_catcher.exceptions import (
     InvalidTimeframeError,
     ScannerAPIError,
 )
+from app.modules.automation.repository.catcher_repository import CatcherRepository
 
 WEI_PER_GWEI = Decimal(10) ** 9
 
@@ -202,7 +200,6 @@ class BaseBlockchainCatcher(BaseScannerClient):
         return (ordered[mid - 1] + ordered[mid]) / Decimal(2)
 
 
-### Repo Funcition 
     def capture_and_insert(
         self,
         db,
@@ -210,13 +207,17 @@ class BaseBlockchainCatcher(BaseScannerClient):
         sample_size: int = 5,
         usd_price: Decimal | None = None,
     ) -> FeeSnapshot:
+        repo = CatcherRepository(db)
+
         unit, seconds = self.resolve_timeframe(timeframe)
         blocks = self.fetch_blocks_by_time_range(seconds=seconds, sample_size=sample_size)
 
-        blockchain = self._get_or_create_blockchain(db)
-        time_unit = self._get_or_create_time_unit(db, unit, seconds)
+        blockchain = repo.get_or_create_blockchain(
+            self.blockchain_name, self.blockchain_symbol, self.config.api_url
+        )
+        time_unit = repo.get_or_create_time_unit(unit, seconds)
 
-        previous_fee = self._get_previous_fee(db, blockchain.id, time_unit.id)
+        previous_fee = repo.get_previous_fee(blockchain.id, time_unit.id)
         metrics = self.compute_snapshot_metrics(
             captured_blocks=blocks,
             previous_fee_value=previous_fee,
@@ -239,52 +240,7 @@ class BaseBlockchainCatcher(BaseScannerClient):
             block_number=metrics["block_number"],
             recorded_at=datetime.now(timezone.utc),
         )
-        db.add(snapshot)
-        db.commit()
-        db.refresh(snapshot)
-        return snapshot
-
-    def _get_or_create_blockchain(self, db) -> Blockchain:
-        blockchain = db.scalars(
-            select(Blockchain).where(Blockchain.name == self.blockchain_name)
-        ).first()
-        if blockchain is None:
-            blockchain = Blockchain(
-                name=self.blockchain_name,
-                symbol=self.blockchain_symbol,
-                native_currency=self.blockchain_symbol,
-                explorer_api_url=self.config.api_url,
-                is_active=True,
-            )
-            db.add(blockchain)
-            db.commit()
-            db.refresh(blockchain)
-        return blockchain
-
-    @staticmethod
-    def _get_or_create_time_unit(db, unit: TimeUnitName, seconds: int) -> TimeUnit:
-        time_unit = db.scalars(
-            select(TimeUnit).where(TimeUnit.name == unit)
-        ).first()
-        if time_unit is None:
-            time_unit = TimeUnit(name=unit, interval_seconds=seconds)
-            db.add(time_unit)
-            db.commit()
-            db.refresh(time_unit)
-        return time_unit
-
-    @staticmethod
-    def _get_previous_fee(db, blockchain_id: int, time_unit_id: int) -> Decimal | None:
-        prior = db.scalars(
-            select(FeeSnapshot)
-            .where(
-                FeeSnapshot.blockchain_id == blockchain_id,
-                FeeSnapshot.time_unit_id == time_unit_id,
-            )
-            .order_by(FeeSnapshot.id.desc())
-            .limit(1)
-        ).first()
-        return prior.raw_fee_value if prior is not None else None
+        return repo.insert_snapshot(snapshot)
 
 
 __all__ = ["CapturedBlock", "BaseBlockchainCatcher"]
