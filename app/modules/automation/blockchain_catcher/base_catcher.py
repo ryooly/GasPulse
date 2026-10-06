@@ -16,6 +16,7 @@ from app.modules.automation.blockchain_catcher.exceptions import (
 )
 from app.modules.automation.repository.catcher_repository import CatcherRepository
 
+
 WEI_PER_GWEI = Decimal(10) ** 9
 
 _TIMEFRAME_MAP: dict[str, tuple[TimeUnitName, int]] = {
@@ -139,7 +140,6 @@ class BaseBlockchainCatcher(BaseScannerClient):
             if numbers[-1] != end_block:
                 numbers.append(end_block)
         return [self.get_block_by_number(n) for n in dict.fromkeys(numbers)]
-
 
     def compute_snapshot_metrics(
         self,
