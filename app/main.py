@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 import app.models
+from app.exception import Global
 from app.modules.api.fee_chart import router as fee_chart_router
-from app.modules.api.fee_snapshots import router as fee_snapshots_router
 from db.base import Base
 from db.session import engine
 
@@ -25,8 +25,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(fee_snapshots_router)
 app.include_router(fee_chart_router)
+
+Global.register(app)
 
 
 @app.get("/", tags=["health"])

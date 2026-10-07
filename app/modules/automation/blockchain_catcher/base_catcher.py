@@ -4,15 +4,15 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.exception import (
+    InvalidTimeframeError,
+    ScannerAPIError,
+)
 from app.models.fee_snapshot_models import FeeSnapshot, FeeStatus
 from app.models.time_unit_models import TimeUnitName
 from app.modules.automation.blockchain_catcher.base_client import (
     BaseScannerClient,
     ScannerConfig,
-)
-from app.modules.automation.blockchain_catcher.exceptions import (
-    InvalidTimeframeError,
-    ScannerAPIError,
 )
 from app.modules.automation.repository.catcher_repository import CatcherRepository
 
@@ -216,7 +216,7 @@ class BaseBlockchainCatcher(BaseScannerClient):
             self.blockchain_name, self.blockchain_symbol, self.config.api_url
         )
         time_unit = repo.get_or_create_time_unit(unit, seconds)
-
+ 
         previous_fee = repo.get_previous_fee(blockchain.id, time_unit.id)
         metrics = self.compute_snapshot_metrics(
             captured_blocks=blocks,

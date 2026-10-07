@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.models.fee_chart_models import FeeChartData
 from app.modules.controllers.fee_chart_controller import FeeChartController
 from app.modules.repository.fee_chart_repository import FeeChartRepository
-from app.modules.service.fee_chart_service import (
-    FeeChartService,
-    InvalidChartRangeError,
-)
+from app.modules.service.fee_chart_service import FeeChartService
 from app.schemas.fee_chart_schemas import FeeChartPointPublic
 from db.session import get_db
 
@@ -33,10 +30,7 @@ def get_hour_chart(
     ),
     controller: FeeChartController = Depends(get_chart_controller),
 ) -> list[FeeChartData]:
-    try:
-        return controller.get_hourly_chart(blockchain, points)
-    except InvalidChartRangeError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return controller.get_hourly_chart(blockchain, points)
 
 
 @router.get("/day", response_model=list[FeeChartPointPublic])
@@ -50,10 +44,7 @@ def get_day_chart(
     ),
     controller: FeeChartController = Depends(get_chart_controller),
 ) -> list[FeeChartData]:
-    try:
-        return controller.get_daily_chart(blockchain, points)
-    except InvalidChartRangeError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return controller.get_daily_chart(blockchain, points)
 
 
 @router.get("/week", response_model=list[FeeChartPointPublic])
@@ -67,10 +58,7 @@ def get_week_chart(
     ),
     controller: FeeChartController = Depends(get_chart_controller),
 ) -> list[FeeChartData]:
-    try:
-        return controller.get_weekly_chart(blockchain, points)
-    except InvalidChartRangeError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return controller.get_weekly_chart(blockchain, points)
 
 
 __all__ = ["router"]

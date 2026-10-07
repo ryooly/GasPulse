@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import requests
 
-from app.modules.automation.blockchain_catcher.exceptions import ScannerAPIError
+from app.exception import ScannerAPIError
 
 
 @dataclass

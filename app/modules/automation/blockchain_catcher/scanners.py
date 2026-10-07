@@ -77,12 +77,4 @@ __all__ = [
     "snowtrace_catcher",
 ]
 
-
-
-# Belumm di proses lebih lanjut harusnya dia ini langusng return gitu dan masukan ke dalam fungsi 
-
-
-# Hapus inputs params soalnya gak penting 
-
-
 # Tambahkan env untuk key api url

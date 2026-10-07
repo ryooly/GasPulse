@@ -89,13 +89,6 @@ class FeeSnapshotRead(FeeSnapshotBase):
 
 
 class FeeSnapshotPublic(BaseModel):
-    """User-facing fee snapshot returned by the public fee endpoints.
-
-    Mirrors the full ``FeeSnapshot`` payload for the frontend but drops
-    internal-only fields that should never be shown to users (``created_at``
-    and the raw ``blockchain_id`` / ``time_unit_id`` foreign keys). The related
-    blockchain and time-unit names are surfaced instead of their ids.
-    """
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

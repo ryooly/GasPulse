@@ -1,25 +1,9 @@
 from __future__ import annotations
 
+from app.exception import InvalidChartRangeError
 from app.models.fee_chart_models import FeeChartData
 from app.models.time_unit_models import TimeUnitName
 from app.modules.repository import FeeChartRepository
-
-
-class InvalidChartRangeError(ValueError):
-
-    def __init__(
-        self,
-        time_unit: TimeUnitName,
-        requested: int,
-        allowed: tuple[int, ...],
-    ) -> None:
-        self.time_unit = time_unit
-        self.requested = requested
-        self.allowed = allowed
-        super().__init__(
-            f"Invalid range {requested} for timeframe '{time_unit.value}'. "
-            f"Allowed values: {', '.join(str(value) for value in allowed)}."
-        ) # akan dipindah ke tempat lain, misalnya ke file error handling
 
 
 class FeeChartService:
