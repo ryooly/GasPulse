@@ -1,14 +1,4 @@
-"""Shared building blocks for the per-timeframe automation engines.
 
-Each timeframe lives in its own folder (``hour/``, ``day/``, ``week/``); those
-modules only declare *which* timeframe and cadence they use and reuse the pieces
-here:
-
-* :data:`SCANNER_CLASSES` - the scanner APIs from ``blockchain_catcher.scanners``.
-* :func:`capture_scanner` - runs ONE scanner API call and inserts a ``FeeSnapshot``.
-* :class:`TimeframeEngine` - an APScheduler ``BackgroundScheduler`` that triggers
-  every scanner API on that timeframe's interval.
-"""
 
 from __future__ import annotations
 
