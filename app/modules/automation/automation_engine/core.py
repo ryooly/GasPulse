@@ -35,8 +35,6 @@ logger = logging.getLogger("gaspulse.automation.engine")
 
 DEFAULT_SAMPLE_SIZE = 5
 
-# Every scanner API exposed by blockchain_catcher.scanners, as (id, catcher class).
-# Calling the class builds a fresh catcher so config is re-read from env each run.
 SCANNER_CLASSES: tuple[tuple[str, Callable[[], BaseBlockchainCatcher]], ...] = (
     ("etherscan", EtherscanCatcher),
     ("polygonscan", PolygonscanCatcher),
@@ -45,7 +43,6 @@ SCANNER_CLASSES: tuple[tuple[str, Callable[[], BaseBlockchainCatcher]], ...] = (
     ("snowtrace", SnowtraceCatcher),
 )
 
-# How often each timeframe's capture runs (cadence matches the timeframe period).
 TIMEFRAME_INTERVAL_SECONDS: dict[TimeUnitName, int] = {
     TimeUnitName.HOUR: 3600,
     TimeUnitName.DAY: 86400,
@@ -63,11 +60,6 @@ def capture_scanner(
     timeframe: str | TimeUnitName,
     sample_size: int = DEFAULT_SAMPLE_SIZE,
 ) -> None:
-    """Run one scanner API call for a timeframe and persist a ``FeeSnapshot``.
-
-    Opens its own DB session; failures are rolled back and logged so a single
-    scanner never crashes the scheduler or blocks the other jobs.
-    """
     unit = _timeframe_value(timeframe)
     db = SessionLocal()
     try:
@@ -77,7 +69,7 @@ def capture_scanner(
             "capture %s [%s]: fee=%s status=%s block=%s",
             scanner_id, unit, snapshot.raw_fee_value, snapshot.status.value, snapshot.block_number,
         )
-    except Exception:  # keep the scheduler alive regardless of a job's failure
+    except Exception: 
         db.rollback()
         logger.exception("capture %s [%s] failed", scanner_id, unit)
     finally:
@@ -85,11 +77,6 @@ def capture_scanner(
 
 
 class TimeframeEngine:
-    """APScheduler engine that triggers every scanner API for one timeframe.
-
-    A single instance is created per timeframe folder (hour / day / week); it
-    schedules one recurring job per scanner API on that timeframe's interval.
-    """
 
     def __init__(
         self,
@@ -105,8 +92,8 @@ class TimeframeEngine:
         self._sample_size = int(sample_size)
         self._scheduler = BackgroundScheduler(
             job_defaults={
-                "coalesce": True,        # collapse missed runs into a single one
-                "max_instances": 1,      # never overlap two runs of the same job
+                "coalesce": True,     
+                "max_instances": 1,    
                 "misfire_grace_time": 30,
             },
         )
@@ -150,13 +137,11 @@ class TimeframeEngine:
         )
 
     def shutdown(self) -> None:
-        """Stop the scheduler if it is running."""
         if self._scheduler.running:
             self._scheduler.shutdown(wait=False)
             logger.info("%s engine stopped", self.name)
 
     def capture_now(self, scanner_id: str | None = None) -> None:
-        """Run one (or all) scanner API(s) for this timeframe immediately."""
         selected = [
             (sid, factory) for sid, factory in SCANNER_CLASSES
             if scanner_id is None or sid == scanner_id

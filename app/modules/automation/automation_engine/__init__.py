@@ -30,13 +30,11 @@ TIMEFRAME_ENGINES: tuple[TimeframeEngine, ...] = (hour_engine, day_engine, week_
 
 
 def start_all(run_now: bool = False) -> None:
-    """Start the hour, day and week engines together."""
     for engine in TIMEFRAME_ENGINES:
         engine.start(run_now=run_now)
 
 
 def shutdown_all() -> None:
-    """Stop every timeframe engine that is currently running."""
     for engine in TIMEFRAME_ENGINES:
         engine.shutdown()
 
