@@ -1,9 +1,3 @@
-"""Blockchain scanner catchers package.
-
-Public surface: the base engine, the concrete per-chain catchers, shared
-exceptions, the ``CapturedBlock`` DTO, and ready-to-use singletons.
-"""
-
 from app.exception import (
     InvalidTimeframeError,
     ScannerAPIError,

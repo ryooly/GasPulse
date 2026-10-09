@@ -1,18 +1,3 @@
-"""Automation engine package.
-
-The automation is split by timeframe into three folders, each an APScheduler
-engine that triggers every scanner API on that timeframe's interval and runs the
-capture-and-insert flow:
-
-* :mod:`.hour` -> ``hour_engine``  (every scanner, hourly)
-* :mod:`.day`  -> ``day_engine``   (every scanner, daily)
-* :mod:`.week` -> ``week_engine``  (every scanner, weekly)
-
-Shared pieces (:class:`TimeframeEngine`, :func:`capture_scanner`, the scanner
-list) live in :mod:`.core`. Start any subset with each engine's ``start()`` or
-use ``start_all()`` / ``shutdown_all()``.
-"""
-
 from __future__ import annotations
 
 from app.modules.automation.automation_engine.core import (
@@ -25,7 +10,6 @@ from app.modules.automation.automation_engine.day import day_engine
 from app.modules.automation.automation_engine.hour import hour_engine
 from app.modules.automation.automation_engine.week import week_engine
 
-# All timeframe engines, in capture-frequency order.
 TIMEFRAME_ENGINES: tuple[TimeframeEngine, ...] = (hour_engine, day_engine, week_engine)
 
 

@@ -76,5 +76,3 @@ __all__ = [
     "arbiscan_catcher",
     "snowtrace_catcher",
 ]
-
-# Tambahkan env untuk key api url

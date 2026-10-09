@@ -1,10 +1,3 @@
-"""Week automation engine (APScheduler).
-
-Triggers every scanner API (Etherscan, Polygonscan, BscScan, Arbiscan,
-Snowtrace) once per week and runs the capture-and-insert flow for the ``WEEK``
-timeframe.
-"""
-
 from __future__ import annotations
 
 from app.models.time_unit_models import TimeUnitName

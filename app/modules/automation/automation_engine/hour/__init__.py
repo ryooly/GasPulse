@@ -1,5 +1,3 @@
-"""Hour timeframe automation engine package."""
-
 from app.modules.automation.automation_engine.hour.engine import (
     capture_now,
     hour_engine,

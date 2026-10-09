@@ -1,5 +1,3 @@
-"""Week timeframe automation engine package."""
-
 from app.modules.automation.automation_engine.week.engine import (
     capture_now,
     shutdown,

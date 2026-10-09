@@ -1,10 +1,3 @@
-"""Day automation engine (APScheduler).
-
-Triggers every scanner API (Etherscan, Polygonscan, BscScan, Arbiscan,
-Snowtrace) once per day and runs the capture-and-insert flow for the ``DAY``
-timeframe.
-"""
-
 from __future__ import annotations
 
 from app.models.time_unit_models import TimeUnitName
