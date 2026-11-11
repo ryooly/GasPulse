@@ -1,0 +1,39 @@
+﻿from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+import app.models  # noqa: F401
+from app.exception import Global
+from app.modules.api.fee_chart import router as fee_chart_router
+from app.modules.api.testing import router as testing_router
+from db.base import Base
+from db.session import engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(
+    title="GasPulse",
+    description="Blockchain gas fee snapshots exposed for the frontend.",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.include_router(fee_chart_router)
+app.include_router(testing_router)
+
+Global.register(app)
+
+
+@app.get("/", tags=["health"])
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
