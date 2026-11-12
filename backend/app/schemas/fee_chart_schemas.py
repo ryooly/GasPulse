@@ -16,7 +16,13 @@ class FeeChartPointPublic(BaseModel):
     time_unit: str = Field(
         validation_alias=AliasPath("time_unit", "name"),
     )
-    fee_value: Decimal
+    fee_value: Decimal = Field(
+        description="Fee value converted to USDT.",
+    )
+    fee_unit: str = Field(
+        default="USDT",
+        description="Currency unit for fee_value.",
+    )
     recorded_at: datetime
 
 

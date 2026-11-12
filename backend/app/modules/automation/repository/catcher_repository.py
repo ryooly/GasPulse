@@ -54,7 +54,7 @@ class CatcherRepository:
                 FeeSnapshot.blockchain_id == blockchain_id,
                 FeeSnapshot.time_unit_id == time_unit_id,
             )
-            .order_by(FeeSnapshot.id.desc())
+            .order_by(FeeSnapshot.recorded_at.desc(), FeeSnapshot.id.desc())
             .limit(1)
         ).first()
         return prior.raw_fee_value if prior is not None else None

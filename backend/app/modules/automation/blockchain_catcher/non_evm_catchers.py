@@ -35,6 +35,8 @@ class BaseExternalCatcher(BaseScannerClient):
     env_prefix: str = ""
     default_api_url: str = ""
     default_api_key: str = ""
+    # raw fee unit -> native token factor for USD conversion
+    fee_unit_factor: Decimal = Decimal("1")
 
     def __init__(self, config: ScannerConfig | None = None, session=None, **config_kwargs):
         if config is None:
@@ -79,7 +81,11 @@ class BaseExternalCatcher(BaseScannerClient):
                 status = FeeStatus.UP
             elif change_percentage < -STABLE_THRESHOLD:
                 status = FeeStatus.DOWN
-        usd_value = _quantize(raw_fee_value * usd_price, _Q8) if usd_price is not None else None
+        usd_value = (
+            _quantize(raw_fee_value * self.fee_unit_factor * usd_price, _Q8)
+            if usd_price is not None
+            else None
+        )
         return {
             "raw_fee_value": raw_fee_value,
             "usd_value": usd_value,
@@ -129,6 +135,7 @@ class BitcoinMempoolCatcher(BaseExternalCatcher):
     env_prefix = "BITCOIN_MEMPOOL"
     default_api_url = "https://mempool.space/api"
     default_api_key = ""
+    fee_unit_factor = Decimal("1e-8")
 
     def _get_json(self, path: str):
         base = self.config.api_url.rstrip("/")
@@ -195,6 +202,7 @@ class SolanaCatcher(BaseExternalCatcher):
     env_prefix = "SOLANA_RPC"
     default_api_url = "https://api.mainnet-beta.solana.com"
     default_api_key = ""
+    fee_unit_factor = Decimal("1e-9")
 
     def _rpc(self, method: str, params=None):
         payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or []}
@@ -252,6 +260,7 @@ class PolkadotCatcher(BaseExternalCatcher):
     env_prefix = "POLKADOT_SUBSCAN"
     default_api_url = "https://polkadot.api.subscan.io"
     default_api_key = ""
+    fee_unit_factor = Decimal("1e-10")
 
     def fetch_fee_samples(self, seconds: int, sample_size: int = 5) -> list[CapturedBlock]:
         base = self.config.api_url.rstrip("/")

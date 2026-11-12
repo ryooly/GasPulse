@@ -3,11 +3,13 @@
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from app.models.fee_chart_models import FeeChartData
 from app.models.time_unit_models import TimeUnitName
 from app.modules.automation.blockchain_catcher import (
     ArbiscanCatcher,
@@ -21,6 +23,7 @@ from app.modules.automation.blockchain_catcher import (
     SnowtraceCatcher,
     SolanaCatcher,
 )
+from app.modules.tools import get_token_price_usdt
 from db.session import SessionLocal
 
 logger = logging.getLogger("gaspulse.automation.engine")
@@ -39,6 +42,34 @@ SCANNER_CLASSES: tuple[tuple[str, Callable[[], object]], ...] = (
     ("chainlink", ChainlinkCatcher),
 )
 
+# token symbol used for USD/USDT conversion per scanner id
+SCANNER_PRICE_TOKEN: dict[str, str] = {
+    "etherscan": "ETH",
+    "polygonscan": "POL",
+    "bscscan": "BNB",
+    "arbiscan": "ETH",
+    "snowtrace": "AVAX",
+    "bitcoin": "BTC",
+    "solana": "SOL",
+    "polkadot": "DOT",
+    "chainlink": "LINK",
+}
+
+# raw_fee_value unit -> native token factor (same semantics as catcher raw units)
+SCANNER_FEE_UNIT_FACTOR: dict[str, Decimal] = {
+    "etherscan": Decimal("1e-9"),
+    "polygonscan": Decimal("1e-9"),
+    "bscscan": Decimal("1e-9"),
+    "arbiscan": Decimal("1e-9"),
+    "snowtrace": Decimal("1e-9"),
+    "bitcoin": Decimal("1e-8"),
+    "solana": Decimal("1e-9"),
+    "polkadot": Decimal("1e-10"),
+    "chainlink": Decimal("1"),
+}
+
+_USDT_Q = Decimal("0.00000001")
+
 TIMEFRAME_INTERVAL_SECONDS: dict[TimeUnitName, int] = {
     TimeUnitName.HOUR: 3600,
     TimeUnitName.DAY: 86400,
@@ -48,6 +79,39 @@ TIMEFRAME_INTERVAL_SECONDS: dict[TimeUnitName, int] = {
 
 def _timeframe_value(timeframe: str | TimeUnitName) -> str:
     return timeframe.value if isinstance(timeframe, TimeUnitName) else str(timeframe)
+
+
+def _resolve_usd_price(scanner_id: str) -> Decimal | None:
+    token = SCANNER_PRICE_TOKEN.get(scanner_id)
+    if not token:
+        return None
+    try:
+        info = get_token_price_usdt(token)
+        return Decimal(str(info["price_usdt"]))
+    except Exception:
+        logger.warning("failed to resolve USDT price for %s (%s)", scanner_id, token, exc_info=True)
+        return None
+
+
+def _insert_chart_point_usdt(db, snapshot, scanner_id: str, usd_price: Decimal | None) -> None:
+    factor = SCANNER_FEE_UNIT_FACTOR.get(scanner_id, Decimal("1"))
+    if usd_price is not None:
+        fee_usdt = (Decimal(str(snapshot.raw_fee_value)) * factor * usd_price).quantize(_USDT_Q)
+    elif snapshot.usd_value is not None:
+        fee_usdt = Decimal(str(snapshot.usd_value)).quantize(_USDT_Q)
+    else:
+        # Fallback: store raw value if conversion unavailable (keeps pipeline running).
+        fee_usdt = Decimal(str(snapshot.raw_fee_value))
+        logger.warning("storing raw fee_value for %s: no USDT conversion available", scanner_id)
+    db.add(
+        FeeChartData(
+            blockchain_id=snapshot.blockchain_id,
+            time_unit_id=snapshot.time_unit_id,
+            fee_value=fee_usdt,
+            recorded_at=snapshot.recorded_at,
+        )
+    )
+    db.commit()
 
 
 def capture_scanner(
@@ -60,10 +124,21 @@ def capture_scanner(
     db = SessionLocal()
     try:
         catcher = catcher_factory()
-        snapshot = catcher.capture_and_insert(db, timeframe, sample_size=sample_size)
+        usd_price = _resolve_usd_price(scanner_id)
+        snapshot = catcher.capture_and_insert(db, timeframe, sample_size=sample_size, usd_price=usd_price)
+        try:
+            _insert_chart_point_usdt(db, snapshot, scanner_id, usd_price)
+        except Exception:
+            db.rollback()
+            logger.exception("failed to insert USDT chart point for %s [%s]", scanner_id, unit)
         logger.info(
-            "capture %s [%s]: fee=%s status=%s block=%s",
-            scanner_id, unit, snapshot.raw_fee_value, snapshot.status.value, snapshot.block_number,
+            "capture %s [%s]: raw=%s usd=%s status=%s block=%s",
+            scanner_id,
+            unit,
+            snapshot.raw_fee_value,
+            snapshot.usd_value,
+            snapshot.status.value,
+            snapshot.block_number,
         )
     except Exception:
         db.rollback()

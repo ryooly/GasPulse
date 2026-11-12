@@ -138,6 +138,12 @@ class BaseBlockchainCatcher(BaseScannerClient):
                 numbers.append(end_block)
         return [self.get_block_by_number(n) for n in dict.fromkeys(numbers)]
 
+    def _compute_usd_value(self, raw_fee_value: Decimal, usd_price: Decimal | None) -> Decimal | None:
+        # EVM raw fees are in gwei (1e-9 native token).
+        if usd_price is None:
+            return None
+        return _quantize(raw_fee_value * Decimal("1e-9") * usd_price, _Q8)
+
     def compute_snapshot_metrics(
         self,
         captured_blocks: list[CapturedBlock],
@@ -169,9 +175,7 @@ class BaseBlockchainCatcher(BaseScannerClient):
             elif change_percentage < -STABLE_THRESHOLD:
                 status = FeeStatus.DOWN
 
-        usd_value = (
-            _quantize(raw_fee_value * usd_price, _Q8) if usd_price is not None else None
-        )
+        usd_value = self._compute_usd_value(raw_fee_value, usd_price)
 
         return {
             "raw_fee_value": raw_fee_value,

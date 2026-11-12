@@ -192,6 +192,7 @@ def get_validators_last_24h(blockchain: str) -> dict[str, Any]:
         "polygon": "Polygon",
         "pol": "Polygon",
         "bnb smart chain": "BNB Smart Chain",
+        "bnb chain": "BNB Smart Chain",
         "bsc": "BNB Smart Chain",
         "bnb": "BNB Smart Chain",
         "arbitrum": "Arbitrum",

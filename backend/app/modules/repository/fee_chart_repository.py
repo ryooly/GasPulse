@@ -37,7 +37,7 @@ class FeeChartRepository:
                 selectinload(FeeChartData.blockchain),
                 selectinload(FeeChartData.time_unit),
             )
-            .order_by(FeeChartData.recorded_at.desc())
+            .order_by(FeeChartData.recorded_at.desc(), FeeChartData.id.desc())
             .limit(limit)
         )
         points = list(self._session.scalars(stmt).all())

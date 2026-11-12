@@ -164,6 +164,7 @@ def get_transactions_last_24h(blockchain: str) -> dict[str, Any]:
         "polygon": ("Polygon", "https://api.polygonscan.com/api", "POLYGONSCAN_API_KEY"),
         "pol": ("Polygon", "https://api.polygonscan.com/api", "POLYGONSCAN_API_KEY"),
         "bnb smart chain": ("BNB Smart Chain", "https://api.bscscan.com/api", "BSCSCAN_API_KEY"),
+        "bnb chain": ("BNB Smart Chain", "https://api.bscscan.com/api", "BSCSCAN_API_KEY"),
         "bsc": ("BNB Smart Chain", "https://api.bscscan.com/api", "BSCSCAN_API_KEY"),
         "bnb": ("BNB Smart Chain", "https://api.bscscan.com/api", "BSCSCAN_API_KEY"),
         "arbitrum": ("Arbitrum", "https://api.arbiscan.io/api", "ARBISCAN_API_KEY"),
